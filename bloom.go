@@ -2,14 +2,14 @@ package bloom
 
 /*
 A Bloom filter is a representation of a set of _n_ items, where the main
-requirement is to make membership queries; _i.e._, whether an item is a 
+requirement is to make membership queries; _i.e._, whether an item is a
 member of a set.
 
 A Bloom filter has two parameters: _m_, a maximum size (typically a reasonably large
 multiple of the cardinality of the set to represent) and _k_, the number of hashing
 functions on elements of the set. (The actual hashing functions are important, too,
 but this is not a parameter for this implementation). A Bloom filter is backed by
-a BitSet; a key is represented in the filter by setting the bits at each value of the 
+a BitSet; a key is represented in the filter by setting the bits at each value of the
 hashing functions (modulo _m_). Set membership is done by _testing_ whether the
 bits at each value of the hashing functions (again, modulo _m_) are set. If so,
 the item is in the set. If the item is actually in the set, a Bloom filter will
@@ -25,7 +25,7 @@ h2, are used. Then, the _i_th hashing function is:
 
 Thus, the underlying hash function, FNV, is only called once per key.
 
-This implementation accepts keys for setting as testing as []byte. Thus, to 
+This implementation accepts keys for setting as testing as []byte. Thus, to
 add a string item, "Love":
 
     uint n = 1000
@@ -47,7 +47,7 @@ for example, to add a uint32 to the filter:
 Finally, there is a method to estimate the false positive rate of a particular
 bloom filter for a set of size _n_:
 
-    if filter.EstimateFalsePositiveRate(1000) > 0.001 
+    if filter.EstimateFalsePositiveRate(1000) > 0.001
 
 Given the particular hashing scheme, it's best to be empirical about this. Note
 that estimating the FP rate will clear the Bloom filter.
@@ -59,7 +59,6 @@ import (
 	"hash"
 	"hash/fnv"
 	"math"
-	//"fmt"
 )
 
 type BloomFilter struct {
@@ -69,23 +68,23 @@ type BloomFilter struct {
 	hasher hash.Hash64
 }
 
-// Create a new Bloom filter with _m_ bits and _k_ hashing functions 
+// Create a new Bloom filter with _m_ bits and _k_ hashing functions
 func New(m uint, k uint) *BloomFilter {
-	return &BloomFilter{m, k, bitset.New(m), fnv.New64()}
+	return &BloomFilter{m, k, bitset.New(uint32(m)), fnv.New64()}
 }
 
-// estimate parameters. Based on https://bitbucket.org/ww/bloom/src/829aa19d01d9/bloom.go
+// Estimate parameters. Based on https://bitbucket.org/ww/bloom/src/829aa19d01d9/bloom.go
 // used with permission.
-func estimateParameters(n uint, p float64) (m uint, k uint) {
+func EstimateParameters(n uint, p float64) (m uint, k uint) {
 	m = uint(-1 * float64(n) * math.Log(p) / math.Pow(math.Log(2), 2))
 	k = uint(math.Ceil(math.Log(2) * float64(m) / float64(n)))
 	return
 }
 
-// Create a new Bloom filter for about n items with fp 
+// Create a new Bloom filter for about n items with fp
 // false positive rate
 func NewWithEstimates(n uint, fp float64) *BloomFilter {
-	m, k := estimateParameters(n, fp)
+	m, k := EstimateParameters(n, fp)
 	return New(m, k)
 }
 
@@ -112,16 +111,16 @@ func (f *BloomFilter) base_hashes(data []byte) (a uint32, b uint32) {
 }
 
 // get the _k_ locations to set/test in the underlying bitset
-func (f *BloomFilter) locations(data []byte) (locs []uint) {
-	locs = make([]uint, f.k)
+func (f *BloomFilter) locations(data []byte) (locs []uint32){
+	locs = make([]uint32, f.k)
 	a, b := f.base_hashes(data)
-	ua := uint(a)
-	ub := uint(b)
-	//fmt.Println(ua, ub)
-	for i := uint(0); i < f.k; i++ {
-		locs[i] = (ua + ub*i) % f.m
+	ua := uint32(a)
+	ub := uint32(b)
+	m := uint32(f.m)
+	k := uint32(f.k)
+	for i := uint32(0); i < k; i++ {
+		locs[i] = (ua + ub*i) % m
 	}
-	//fmt.Println(data, "->", locs)
 	return
 }
 
@@ -170,4 +169,36 @@ func (f *BloomFilter) EstimateFalsePositiveRate(n uint) (fp_rate float64) {
 	fp_rate = float64(fp) / float64(100)
 	f.ClearAll()
 	return
+}
+/*
+type BloomFilter struct {
+	m      uint
+	k      uint
+	b      *bitset.BitSet
+	hasher hash.Hash64
+}*/
+
+func Dump(f *BloomFilter) []byte {
+	bitDump := bitset.Dump(f.b)
+	maxsize := 2*binary.MaxVarintLen64
+	dump := make([]byte, maxsize)
+	//pack m and k
+	pos := binary.PutUvarint(dump, uint64(f.m))
+	pos += binary.PutUvarint(dump[pos:], uint64(f.k))
+	dump1 := append(dump[0:pos], bitDump...)
+	return dump1
+}
+
+func Restore(dump []byte) *BloomFilter {
+	pos := 0
+	m, n := binary.Uvarint(dump)//unpack n
+	pos += n
+	k, n := binary.Uvarint(dump[pos:])//unpack k
+	pos += n
+	b := bitset.Restore(dump[pos:]) //restore bitset
+
+	f := New(uint(m), uint(k)) //create new *BloomFilter value
+	//TODO: check if cannot create bf by hand (and save one bitset creation)
+	f.b = b //replace bitset
+	return f
 }

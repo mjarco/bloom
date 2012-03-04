@@ -2,7 +2,7 @@ package bloom
 
 import (
 	"encoding/binary"
-	"fmt"
+//	"fmt"
 	"testing"
 )
 
@@ -66,7 +66,7 @@ func TestDirect15_10(t *testing.T) {
 func TestEstimated10_0001(t *testing.T) {
 	n := uint(10000)
 	fp := 0.0001
-	m, k := estimateParameters(n, fp)
+	m, k := EstimateParameters(n, fp)
 	f := NewWithEstimates(n, fp)
 	fp_rate := f.EstimateFalsePositiveRate(n)
 	if fp_rate > fp {
@@ -77,7 +77,7 @@ func TestEstimated10_0001(t *testing.T) {
 func TestEstimated10_001(t *testing.T) {
 	n := uint(10000)
 	fp := 0.001
-	m, k := estimateParameters(n, fp)
+	m, k := EstimateParameters(n, fp)
 	f := NewWithEstimates(n, fp)
 	fp_rate := f.EstimateFalsePositiveRate(n)
 	if fp_rate > fp {
@@ -85,36 +85,64 @@ func TestEstimated10_001(t *testing.T) {
 	}
 }
 
-func BenchmarkDirect(t *testing.B) {
-	n := uint(10000)
-	max_k := uint(10)
-	max_load := uint(20)
-	fmt.Printf("m/n")
-	for k := uint(2); k <= max_k; k++ {
-		fmt.Printf("\tk=%v", k)
+func TestDumpRestore(t *testing.T) {
+	a := NewWithEstimates(20000, 0.01)
+	addValues := [][]byte{
+		[]byte("ala"),
+		[]byte("ma"),
+		[]byte("kota"),
+		[]byte("a"),
+		[]byte("kot"),
+		[]byte("nie")}
+	for _, v := range addValues {
+		a.Add(v)
 	}
-	fmt.Println()
-	for load := uint(2); load <= max_load; load++ {
-		fmt.Print(load)
-		for k := uint(2); k <= max_k; k++ {
-			f := New(n*load, k)
-			fp_rate := f.EstimateFalsePositiveRate(n)
-			fmt.Printf("\t%f", fp_rate)
+	dump := Dump(a)
+	b := Restore(dump)
+	for _, v := range addValues {
+		if !b.Test(v) {//no false negatives!
+			t.Error("Did not restore properly")
 		}
-		fmt.Println()
 	}
 }
 
-func BenchmarkEstimted(t *testing.B) {
-	for n := uint(5000); n <= 50000; n += 5000 {
-		fmt.Printf("%v", n)
-		for fp := 0.1; fp >= 0.00001; fp /= 10.0 {
-			fmt.Printf("\t%f", fp)
-			m, k := estimateParameters(n, fp)
-			f := NewWithEstimates(n, fp)
-			fp_rate := f.EstimateFalsePositiveRate(n)
-			fmt.Printf("\t%v\t%v\t%f", m, k, fp_rate)
-		}
-		fmt.Println()
+func BenchmarkAdd(b *testing.B){
+	b.StopTimer()
+	//k, m := EstimateParameters(10000,0.01)
+	n := 10000000
+	f := NewWithEstimates(uint(n), 0.001)
+	n1 := make([]byte, 4)
+	b.StartTimer()
+	for i := 0; i < b.N ; i++ {
+		binary.BigEndian.PutUint32(n1, uint32(i % n))
+		f.Add(n1)
 	}
 }
+
+func BenchmarkNegativeTest(b *testing.B){
+	b.StopTimer()
+	//k, m := EstimateParameters(10000,0.01)
+	n := 10000000
+	f := NewWithEstimates(uint(n), 0.001)
+	n1 := make([]byte, 4)
+	b.StartTimer()
+	for i := 0; i < b.N ; i++ {
+		binary.BigEndian.PutUint32(n1, uint32(i % n))
+		f.Test(n1)
+	}
+}
+
+func BenchmarkPositiveTest(b *testing.B){
+	b.StopTimer()
+	//k, m := EstimateParameters(10000,0.01)
+	n := 10000000
+	f := NewWithEstimates(uint(n), 0.001)
+	n1 := make([]byte, 4)
+	binary.BigEndian.PutUint32(n1, uint32(1))
+	f.Add(n1)
+	b.StartTimer()
+	for i := 0; i < b.N ; i++ {
+		f.Test(n1)
+	}
+}
+
