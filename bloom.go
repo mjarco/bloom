@@ -70,7 +70,7 @@ type BloomFilter struct {
 
 // Create a new Bloom filter with _m_ bits and _k_ hashing functions
 func New(m uint, k uint) *BloomFilter {
-	return &BloomFilter{m, k, bitset.New(uint32(m)), fnv.New64()}
+	return &BloomFilter{m, k, bitset.New(uint(m)), fnv.New64()}
 }
 
 // Estimate parameters. Based on https://bitbucket.org/ww/bloom/src/829aa19d01d9/bloom.go
@@ -111,14 +111,14 @@ func (f *BloomFilter) base_hashes(data []byte) (a uint32, b uint32) {
 }
 
 // get the _k_ locations to set/test in the underlying bitset
-func (f *BloomFilter) locations(data []byte) (locs []uint32){
-	locs = make([]uint32, f.k)
+func (f *BloomFilter) locations(data []byte) (locs []uint){
+	locs = make([]uint, f.k)
 	a, b := f.base_hashes(data)
-	ua := uint32(a)
-	ub := uint32(b)
-	m := uint32(f.m)
-	k := uint32(f.k)
-	for i := uint32(0); i < k; i++ {
+	ua := uint(a)
+	ub := uint(b)
+	m := uint(f.m)
+	k := uint(f.k)
+	for i := uint(0); i < k; i++ {
 		locs[i] = (ua + ub*i) % m
 	}
 	return
