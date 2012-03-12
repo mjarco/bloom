@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 //	"fmt"
 	"testing"
+    "io"
 )
 
 func TestBasic(t *testing.T) {
@@ -85,6 +86,26 @@ func TestEstimated10_001(t *testing.T) {
 	}
 }
 
+type rw struct{
+    buf []byte
+    r int
+}
+
+func (r *rw) Write(b []byte) (int, error) {
+    r.buf = append(r.buf, b...)
+
+    return len(b), nil
+}
+
+func (r *rw) Read(b []byte) (int, error) {
+    n := copy(b, r.buf[r.r:])
+    r.r += n
+    if n < len(b) {//eof
+        return n, io.EOF
+    }
+    return n, nil
+}
+
 func TestDumpRestore(t *testing.T) {
 	a := NewWithEstimates(20000, 0.01)
 	addValues := [][]byte{
@@ -97,8 +118,9 @@ func TestDumpRestore(t *testing.T) {
 	for _, v := range addValues {
 		a.Add(v)
 	}
-	dump := Dump(a)
-	b := Restore(dump)
+    wr := &rw{make([]byte, 0, 10), 0}
+	Encode(wr, a)
+	b := Decode(wr)
 	for _, v := range addValues {
 		if !b.Test(v) {//no false negatives!
 			t.Error("Did not restore properly")

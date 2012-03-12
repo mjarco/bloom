@@ -59,6 +59,7 @@ import (
 	"hash"
 	"hash/fnv"
 	"math"
+	"io"
 )
 
 type BloomFilter struct {
@@ -170,32 +171,35 @@ func (f *BloomFilter) EstimateFalsePositiveRate(n uint) (fp_rate float64) {
 	f.ClearAll()
 	return
 }
-/*
-type BloomFilter struct {
-	m      uint
-	k      uint
-	b      *bitset.BitSet
-	hasher hash.Hash64
-}*/
 
-func Dump(f *BloomFilter) []byte {
-	bitDump := bitset.Dump(f.b)
+func Encode(w io.Writer, f *BloomFilter) {
 	maxsize := 2*binary.MaxVarintLen64
 	dump := make([]byte, maxsize)
 	//pack m and k
 	pos := binary.PutUvarint(dump, uint64(f.m))
 	pos += binary.PutUvarint(dump[pos:], uint64(f.k))
-	dump1 := append(dump[0:pos], bitDump...)
-	return dump1
+	w.Write(dump[0:pos])
+	bitset.Encode(w, f.b)
 }
+func one (r io.Reader) (uint64, error) {
 
-func Restore(dump []byte) *BloomFilter {
-	pos := 0
-	m, n := binary.Uvarint(dump)//unpack n
-	pos += n
-	k, n := binary.Uvarint(dump[pos:])//unpack k
-	pos += n
-	b := bitset.Restore(dump[pos:]) //restore bitset
+    buint := make([]byte, binary.MaxVarintLen64)
+    ic, n := 0, 0
+    var decoded uint64 = 0
+    for n <= 0 {
+        _, err := r.Read(buint[ic:ic+1])
+        if err != nil {
+            return 0, err
+        }
+        ic ++
+        decoded, n = binary.Uvarint(buint[:ic])
+    }
+    return decoded, nil
+}
+func Decode(r io.Reader) *BloomFilter {
+	m, _ := one(r)//unpack n
+	k, _ := one(r)//unpack k
+	b := bitset.Decode(r) //restore bitset
 
 	f := New(uint(m), uint(k)) //create new *BloomFilter value
 	//TODO: check if cannot create bf by hand (and save one bitset creation)
