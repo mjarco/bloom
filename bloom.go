@@ -58,8 +58,8 @@ import (
 	"github.com/mjarco/bitset"
 	"hash"
 	"hash/fnv"
-	"math"
 	"io"
+	"math"
 )
 
 type BloomFilter struct {
@@ -112,7 +112,7 @@ func (f *BloomFilter) base_hashes(data []byte) (a uint32, b uint32) {
 }
 
 // get the _k_ locations to set/test in the underlying bitset
-func (f *BloomFilter) locations(data []byte) (locs []uint){
+func (f *BloomFilter) locations(data []byte) (locs []uint) {
 	locs = make([]uint, f.k)
 	a, b := f.base_hashes(data)
 	ua := uint(a)
@@ -173,7 +173,7 @@ func (f *BloomFilter) EstimateFalsePositiveRate(n uint) (fp_rate float64) {
 }
 
 func Encode(w io.Writer, f *BloomFilter) {
-	maxsize := 2*binary.MaxVarintLen64
+	maxsize := 2 * binary.MaxVarintLen64
 	dump := make([]byte, maxsize)
 	//pack m and k
 	pos := binary.PutUvarint(dump, uint64(f.m))
@@ -181,24 +181,24 @@ func Encode(w io.Writer, f *BloomFilter) {
 	w.Write(dump[0:pos])
 	bitset.Encode(w, f.b)
 }
-func one (r io.Reader) (uint64, error) {
+func one(r io.Reader) (uint64, error) {
 
-    buint := make([]byte, binary.MaxVarintLen64)
-    ic, n := 0, 0
-    var decoded uint64 = 0
-    for n <= 0 {
-        _, err := r.Read(buint[ic:ic+1])
-        if err != nil {
-            return 0, err
-        }
-        ic ++
-        decoded, n = binary.Uvarint(buint[:ic])
-    }
-    return decoded, nil
+	buint := make([]byte, binary.MaxVarintLen64)
+	ic, n := 0, 0
+	var decoded uint64 = 0
+	for n <= 0 {
+		_, err := r.Read(buint[ic : ic+1])
+		if err != nil {
+			return 0, err
+		}
+		ic++
+		decoded, n = binary.Uvarint(buint[:ic])
+	}
+	return decoded, nil
 }
 func Decode(r io.Reader) *BloomFilter {
-	m, _ := one(r)//unpack n
-	k, _ := one(r)//unpack k
+	m, _ := one(r)        //unpack n
+	k, _ := one(r)        //unpack k
 	b := bitset.Decode(r) //restore bitset
 
 	f := New(uint(m), uint(k)) //create new *BloomFilter value

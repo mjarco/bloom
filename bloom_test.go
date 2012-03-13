@@ -2,9 +2,9 @@ package bloom
 
 import (
 	"encoding/binary"
-//	"fmt"
+	//	"fmt"
+	"io"
 	"testing"
-    "io"
 )
 
 func TestBasic(t *testing.T) {
@@ -86,24 +86,24 @@ func TestEstimated10_001(t *testing.T) {
 	}
 }
 
-type rw struct{
-    buf []byte
-    r int
+type rw struct {
+	buf []byte
+	r   int
 }
 
 func (r *rw) Write(b []byte) (int, error) {
-    r.buf = append(r.buf, b...)
+	r.buf = append(r.buf, b...)
 
-    return len(b), nil
+	return len(b), nil
 }
 
 func (r *rw) Read(b []byte) (int, error) {
-    n := copy(b, r.buf[r.r:])
-    r.r += n
-    if n < len(b) {//eof
-        return n, io.EOF
-    }
-    return n, nil
+	n := copy(b, r.buf[r.r:])
+	r.r += n
+	if n < len(b) { //eof
+		return n, io.EOF
+	}
+	return n, nil
 }
 
 func TestDumpRestore(t *testing.T) {
@@ -118,43 +118,43 @@ func TestDumpRestore(t *testing.T) {
 	for _, v := range addValues {
 		a.Add(v)
 	}
-    wr := &rw{make([]byte, 0, 10), 0}
+	wr := &rw{make([]byte, 0, 10), 0}
 	Encode(wr, a)
 	b := Decode(wr)
 	for _, v := range addValues {
-		if !b.Test(v) {//no false negatives!
+		if !b.Test(v) { //no false negatives!
 			t.Error("Did not restore properly")
 		}
 	}
 }
 
-func BenchmarkAdd(b *testing.B){
+func BenchmarkAdd(b *testing.B) {
 	b.StopTimer()
 	//k, m := EstimateParameters(10000,0.01)
 	n := 10000000
 	f := NewWithEstimates(uint(n), 0.001)
 	n1 := make([]byte, 4)
 	b.StartTimer()
-	for i := 0; i < b.N ; i++ {
-		binary.BigEndian.PutUint32(n1, uint32(i % n))
+	for i := 0; i < b.N; i++ {
+		binary.BigEndian.PutUint32(n1, uint32(i%n))
 		f.Add(n1)
 	}
 }
 
-func BenchmarkNegativeTest(b *testing.B){
+func BenchmarkNegativeTest(b *testing.B) {
 	b.StopTimer()
 	//k, m := EstimateParameters(10000,0.01)
 	n := 10000000
 	f := NewWithEstimates(uint(n), 0.001)
 	n1 := make([]byte, 4)
 	b.StartTimer()
-	for i := 0; i < b.N ; i++ {
-		binary.BigEndian.PutUint32(n1, uint32(i % n))
+	for i := 0; i < b.N; i++ {
+		binary.BigEndian.PutUint32(n1, uint32(i%n))
 		f.Test(n1)
 	}
 }
 
-func BenchmarkPositiveTest(b *testing.B){
+func BenchmarkPositiveTest(b *testing.B) {
 	b.StopTimer()
 	//k, m := EstimateParameters(10000,0.01)
 	n := 10000000
@@ -163,8 +163,7 @@ func BenchmarkPositiveTest(b *testing.B){
 	binary.BigEndian.PutUint32(n1, uint32(1))
 	f.Add(n1)
 	b.StartTimer()
-	for i := 0; i < b.N ; i++ {
+	for i := 0; i < b.N; i++ {
 		f.Test(n1)
 	}
 }
-
